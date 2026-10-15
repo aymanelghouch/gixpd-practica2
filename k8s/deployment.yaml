@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: model-server
+  template:
+    metadata:
+      labels:
+        app: model-server
+    spec:
+      containers:
+        - name: server
+          image: model-server:default
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MODEL_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: model-config
+                  key: MODEL_PATH
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+          volumeMounts:
+            - name: model-storage
+              mountPath: /models
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc
