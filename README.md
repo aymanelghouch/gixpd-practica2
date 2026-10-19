@@ -161,13 +161,28 @@ tocar las imágenes.
 
 ## Dificultades y aprendizajes
 
-- GitHub ya no acepta contraseña por HTTPS: hace falta un token personal clásico con permiso `repo` (uno de grano fino dio error 403).
-- `np.save` añade `.npy` al nombre del archivo; train y server deben usar la misma ruta exacta.
-- Con una ruta relativa en `MODEL_PATH` (`models/model.npy`) el servidor no encontraba el modelo; hay que usar la absoluta (`/models/model.npy`).
-- El script del servidor no arranca Flask (no tiene `app.run`), así que se lanza desde el `CMD` con `flask --app main-server run --host=0.0.0.0 --port=8000`. Es el servidor de desarrollo de Flask; en producción se usaría gunicorn.
-- Los contenedores son efímeros: el modelo se guarda en un volumen (en Kubernetes, un PVC) para que sobreviva y lo compartan el Job y el servidor.
-- El alias de `kubectl` solo existía en la terminal donde se escribió: hay que añadirlo a `~/.bashrc`.
-- Tras reiniciar la VM, Minikube estaba parado y `kubectl` daba `no route to host`: hay que hacer `minikube start`.
-- La VM se quedó sin espacio (`no space left on device`) al arrancar Minikube: se amplió el disco a 30 GB.
-- El `selector` del Service tiene que coincidir con las etiquetas de los pods (`app: model-server`); se comprueba con `kubectl get endpoints modelserver`, que debe listar las 3 IPs.
-- Un Job no se puede editar ni relanzar: hay que borrarlo y volver a aplicarlo.
+### Dificultades
+
+| Problema | Solución |
+|---|---|
+| GitHub rechazaba la contraseña por HTTPS (y un token de grano fino dio error 403) | Token personal clásico con permiso `repo` |
+| El servidor no encontraba el modelo: `np.save` añade `.npy` al nombre y la ruta era relativa | Ruta absoluta y exacta en train y server: `/models/model.npy` |
+| El script del servidor no arranca Flask (no tiene `app.run`) | Se lanza desde el `CMD` con `flask --app main-server run --host=0.0.0.0 --port=8000` |
+| Tras reiniciar la VM, `kubectl` daba `no route to host` | `minikube start` (Minikube estaba parado) |
+| `minikube start` falló con `no space left on device` | Ampliar el disco de la VM a 30 GB |
+| El Service no encontraba pods (`get endpoints` vacío) | El `selector` debe coincidir con las etiquetas de los pods (`app: model-server`) |
+| Un Job no se puede editar ni relanzar | Borrarlo con `kubectl delete job` y volver a aplicarlo |
+
+### Aprendizajes
+
+- **Job frente a Deployment:** el Job es una tarea que termina (entrenar); el Deployment mantiene el servicio siempre activo (servir).
+- **ConfigMap:** separa la configuración del código; Job y Deployment leen la misma ruta del modelo.
+- **PVC:** los pods son efímeros, así que el modelo se guarda en un volumen compartido.
+- **Service:** da una dirección estable a pods que cambian; `port` es el del Service y `targetPort` el del contenedor.
+- **Diagnóstico:** `kubectl get`, `describe` y `logs` para saber qué falla.
+
+### Mejoras posibles
+
+- Usar `gunicorn` en lugar del servidor de desarrollo de Flask.
+- Ejecutar los contenedores como usuario no root.
+- Devolver un error 400 en `/model` cuando falta el parámetro `minutes`.
